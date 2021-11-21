@@ -2,6 +2,7 @@ import copy
 import os
 from typing import List, Tuple, Optional, Callable
 import gym
+from gym import wrappers
 from gym import Wrapper
 from gym.utils import seeding
 import numpy as np
