@@ -45,17 +45,21 @@ class RoundaboutEnv(AbstractEnv):
         scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
         action_up = action == 3
         action_down = action == 4
-        reward = self.config["collision_reward"] * self.vehicle.crashed \
+        if self.vehicle.speed < 10:
+            reward = 0
+        else:
+            reward = self.config["collision_reward"] * self.vehicle.crashed \
                     + self.config["lane_change_reward"] * lane_change \
                     + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
                     + self.config["accelaration reward"] * action_up \
                     - self.config["accelaration reward"] * action_down * 2
-            # + self.config["high_speed_reward"] * \
-            #      MDPVehicle.get_speed_index(self.vehicle) / max(MDPVehicle.SPEED_COUNT - 1, 1) \
-        return utils.lmap(reward,
+                    # + self.config["high_speed_reward"] * \
+                    #      MDPVehicle.get_speed_index(self.vehicle) / max(MDPVehicle.SPEED_COUNT - 1, 1) \
+            reward = utils.lmap(reward,
                           [self.config["collision_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
                            self.config["high_speed_reward"] + self.config["accelaration reward"]],
                           [0, 1])
+        return reward
 
     def _is_terminal(self) -> bool:
         """The episode is over when a collision occurs or when the access ramp has been passed."""

@@ -60,23 +60,28 @@ class MergeEnv(AbstractEnv):
         scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
         action_up = action == 3
         action_down = action == 4
-        reward = self.config["collision_reward"] * self.vehicle.crashed \
-            + self.config["right_lane_reward"] * self.vehicle.lane_index[2] / 1 \
-            + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
-            + self.config["accelaration reward"] * action_up \
-            - self.config["accelaration reward"] * action_down * 2
-            # + self.config["high_speed_reward"] * self.vehicle.speed_index / (self.vehicle.SPEED_COUNT - 1) \
+        if self.vehicle.speed < 10:
+            reward = 0
+        else:
+            reward = self.config["collision_reward"] * self.vehicle.crashed \
+                + self.config["right_lane_reward"] * self.vehicle.lane_index[2] / 1 \
+                + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
+                + self.config["accelaration reward"] * action_up \
+                - self.config["accelaration reward"] * action_down * 2
+                # + self.config["high_speed_reward"] * self.vehicle.speed_index / (self.vehicle.SPEED_COUNT - 1) \
 
         # Altruistic penalty
-        for vehicle in self.road.vehicles:
-            if vehicle.lane_index == ("b", "c", 2) and isinstance(vehicle, ControlledVehicle):
-                reward += self.config["merging_speed_reward"] * \
-                          (vehicle.target_speed - vehicle.speed) / vehicle.target_speed
+        # for vehicle in self.road.vehicles:
+        #     if vehicle.lane_index == ("b", "c", 2) and isinstance(vehicle, ControlledVehicle):
+        #         reward += self.config["merging_speed_reward"] * \
+        #                   (vehicle.target_speed - vehicle.speed) / vehicle.target_speed
 
-        return utils.lmap(action_reward[action] + reward,
+            reward = utils.lmap(action_reward[action] + reward,
                           [self.config["collision_reward"] + self.config["merging_speed_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
                            self.config["high_speed_reward"] + self.config["accelaration reward"]],
                           [0, 1])
+
+        return reward
 
     def _is_terminal(self) -> bool:
         """The episode is over when a collision occurs or when the access ramp has been passed."""
