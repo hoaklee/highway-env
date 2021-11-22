@@ -168,7 +168,7 @@ class EventHandler(object):
         """
         if isinstance(action_type, DiscreteMetaAction):
             cls.handle_discrete_action_event(action_type, event)
-        elif action_type.__class__ == ContinuousAction:
+        elif isinstance(action_type, ContinuousAction):
             cls.handle_continuous_action_event(action_type, event)
 
     @classmethod

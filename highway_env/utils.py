@@ -1,20 +1,11 @@
 import copy
 import importlib
 import itertools
-from typing import Tuple, Dict, Callable, List, Optional, Union, Sequence
+from typing import Tuple, Dict, Callable, List, Optional
 
 import numpy as np
 
-# Useful types
-Vector = Union[np.ndarray, Sequence[float]]
-Matrix = Union[np.ndarray, Sequence[Sequence[float]]]
-Interval = Union[np.ndarray,
-                 Tuple[Vector, Vector],
-                 Tuple[Matrix, Matrix],
-                 Tuple[float, float],
-                 List[Vector],
-                 List[Matrix],
-                 List[float]]
+from highway_env.types import Vector, Interval
 
 
 def do_every(duration: float, timer: float) -> bool:
@@ -39,7 +30,7 @@ def constrain(x: float, a: float, b: float) -> np.ndarray:
 def not_zero(x: float, eps: float = 1e-2) -> float:
     if abs(x) > eps:
         return x
-    elif x >= 0:
+    elif x > 0:
         return eps
     else:
         return -eps

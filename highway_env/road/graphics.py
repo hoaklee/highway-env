@@ -5,7 +5,7 @@ import pygame
 
 from highway_env.road.lane import LineType, AbstractLane
 from highway_env.road.road import Road
-from highway_env.utils import Vector
+from highway_env.types import Vector
 from highway_env.vehicle.graphics import VehicleGraphics
 from highway_env.vehicle.objects import Obstacle, Landmark
 
@@ -104,8 +104,7 @@ class LaneGraphics(object):
 
     """A visualization of a lane."""
 
-    # See https://www.researchgate.net/figure/French-road-traffic-lane-description-and-specification_fig4_261170641
-    STRIPE_SPACING: float = 4.33
+    STRIPE_SPACING: float = 5
     """ Offset between stripes [m]"""
 
     STRIPE_LENGTH: float = 3
@@ -340,7 +339,7 @@ class RoadObjectGraphics:
         color = cls.DEFAULT_COLOR
 
         if isinstance(object_, Obstacle):
-            if object_.crashed:
+            if object_.hit:
                 # indicates failure
                 color = cls.RED
             else:

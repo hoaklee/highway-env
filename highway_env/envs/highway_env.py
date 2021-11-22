@@ -22,26 +22,31 @@ class HighwayEnv(AbstractEnv):
         config = super().default_config()
         config.update({
             "observation": {
-                "type": "Kinematics"
+                "type": "Kinematics",
+                "normalize": "True",
+                "absolute": False
             },
             "action": {
+                # "type": "ContinuousAction",
                 "type": "DiscreteMetaAction",
             },
             "lanes_count": 4,
-            "vehicles_count": 50,
+            "vehicles_count": 20,
+            "vehicles_density": 2,
             "controlled_vehicles": 1,
             "initial_lane_id": None,
-            "duration": 40,  # [s]
-            "ego_spacing": 2,
-            "vehicles_density": 1,
+            "duration": 80,  # [s]
+            "ego_spacing": 1.5,
             "collision_reward": -1,    # The reward received when colliding with a vehicle.
-            "right_lane_reward": 0.1,  # The reward received when driving on the right-most lanes, linearly mapped to
+            "right_lane_reward": 0,    # The reward received when driving on the right-most lanes, linearly mapped to
                                        # zero for other lanes.
-            "high_speed_reward": 0.4,  # The reward received when driving at full speed, linearly mapped to zero for
+            "high_speed_reward": 2,  # The reward received when driving at full speed, linearly mapped to zero for
                                        # lower speeds according to config["reward_speed_range"].
-            "lane_change_reward": 0,   # The reward received at each lane change action.
-            "reward_speed_range": [20, 30],
-            "offroad_terminal": False
+            "lane_change_reward": -0.2,   # The reward received at each lane change action.
+            "accelaration reward": 1,
+            "reward_speed_range": [25, 40],
+            "offroad_terminal": True,
+            "disable_collision_checks": True
         })
         return config
 
@@ -67,13 +72,19 @@ class HighwayEnv(AbstractEnv):
                 lane_id=self.config["initial_lane_id"],
                 spacing=self.config["ego_spacing"]
             )
+            # controlled_vehicle = self.action_type.vehicle_class.make_on_lane(
+            #     self.road,
+            #     lane_index={'0','1',1},
+            #     longitudinal=0.5,
+            #     speed=25
+            # )
             self.controlled_vehicles.append(controlled_vehicle)
             self.road.vehicles.append(controlled_vehicle)
 
             for _ in range(others):
-                vehicle = other_vehicles_type.create_random(self.road, spacing=1 / self.config["vehicles_density"])
-                vehicle.randomize_behavior()
-                self.road.vehicles.append(vehicle)
+                self.road.vehicles.append(
+                    other_vehicles_type.create_random(self.road, spacing=1 / self.config["vehicles_density"])
+                )
 
     def _reward(self, action: Action) -> float:
         """
@@ -85,13 +96,27 @@ class HighwayEnv(AbstractEnv):
         lane = self.vehicle.target_lane_index[2] if isinstance(self.vehicle, ControlledVehicle) \
             else self.vehicle.lane_index[2]
         scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
+        lane_changed = 0            # TODO: comment when not using discrete action
+        if action == 0 or action == 2:        # TODO: comment when not using discrete action
+            lane_changed = 1        # TODO: comment when not using discrete action
+        lane_change = action == 0 or action == 2
+        action_up = action == 3
+        action_down = action == 4
         reward = \
             + self.config["collision_reward"] * self.vehicle.crashed \
-            + self.config["right_lane_reward"] * lane / max(len(neighbours) - 1, 1) \
-            + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1)
+            + self.config["lane_change_reward"] * lane_changed \
+            + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
+            + self.config["accelaration reward"] * action_up \
+            - self.config["accelaration reward"] * action_down * 2
+            # + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1)
+        # reward = \
+        #     + self.config["collision_reward"] * self.vehicle.crashed \
+        #     + self.config["right_lane_reward"] * lane / max(len(neighbours) - 1, 1) \
+        #     + self.config["lane_change_reward"] * action[0] \
+        #     + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1)
         reward = utils.lmap(reward,
-                          [self.config["collision_reward"],
-                           self.config["high_speed_reward"] + self.config["right_lane_reward"]],
+                          [self.config["collision_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
+                           self.config["high_speed_reward"] + self.config["accelaration reward"]],
                           [0, 1])
         reward = 0 if not self.vehicle.on_road else reward
         return reward
@@ -107,39 +132,7 @@ class HighwayEnv(AbstractEnv):
         return float(self.vehicle.crashed)
 
 
-class HighwayEnvFast(HighwayEnv):
-    """
-    A variant of highway-v0 with faster execution:
-        - lower simulation frequency
-        - fewer vehicles in the scene (and fewer lanes, shorter episode duration)
-        - only check collision of controlled vehicles with others
-    """
-    @classmethod
-    def default_config(cls) -> dict:
-        cfg = super().default_config()
-        cfg.update({
-            "simulation_frequency": 5,
-            "lanes_count": 3,
-            "vehicles_count": 20,
-            "duration": 30,  # [s]
-            "ego_spacing": 1.5,
-        })
-        return cfg
-
-    def _create_vehicles(self) -> None:
-        super()._create_vehicles()
-        # Disable collision check for uncontrolled vehicles
-        for vehicle in self.road.vehicles:
-            if vehicle not in self.controlled_vehicles:
-                vehicle.check_collisions = False
-
-
 register(
     id='highway-v0',
     entry_point='highway_env.envs:HighwayEnv',
-)
-
-register(
-    id='highway-fast-v0',
-    entry_point='highway_env.envs:HighwayEnvFast',
 )

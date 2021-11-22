@@ -23,11 +23,23 @@ class MergeEnv(AbstractEnv):
     def default_config(cls) -> dict:
         cfg = super().default_config()
         cfg.update({
+            "observation": {
+                "type": "Kinematics",
+                "normalize": "True",
+                "absolute": False
+            },
+            "vehicles_count": 20,
+            "vehicles_density": 2,
             "collision_reward": -1,
-            "right_lane_reward": 0.1,
-            "high_speed_reward": 0.2,
-            "merging_speed_reward": -0.5,
+            "right_lane_reward": 0,
+            "high_speed_reward": 2,
+            "merging_speed_reward": 0,
             "lane_change_reward": -0.05,
+            "accelaration reward": 1,
+            "reward_speed_range": [25, 40],
+            "duration": 80,
+            "ego_spacing": 1.5,
+            "disable_collision_checks": True
         })
         return cfg
 
@@ -45,9 +57,15 @@ class MergeEnv(AbstractEnv):
                          2: self.config["lane_change_reward"],
                          3: 0,
                          4: 0}
+        scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
+        action_up = action == 3
+        action_down = action == 4
         reward = self.config["collision_reward"] * self.vehicle.crashed \
             + self.config["right_lane_reward"] * self.vehicle.lane_index[2] / 1 \
-            + self.config["high_speed_reward"] * self.vehicle.speed_index / (self.vehicle.SPEED_COUNT - 1)
+            + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
+            + self.config["accelaration reward"] * action_up \
+            - self.config["accelaration reward"] * action_down * 2
+            # + self.config["high_speed_reward"] * self.vehicle.speed_index / (self.vehicle.SPEED_COUNT - 1) \
 
         # Altruistic penalty
         for vehicle in self.road.vehicles:
@@ -56,13 +74,14 @@ class MergeEnv(AbstractEnv):
                           (vehicle.target_speed - vehicle.speed) / vehicle.target_speed
 
         return utils.lmap(action_reward[action] + reward,
-                          [self.config["collision_reward"] + self.config["merging_speed_reward"],
-                           self.config["high_speed_reward"] + self.config["right_lane_reward"]],
+                          [self.config["collision_reward"] + self.config["merging_speed_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
+                           self.config["high_speed_reward"] + self.config["accelaration reward"]],
                           [0, 1])
 
     def _is_terminal(self) -> bool:
         """The episode is over when a collision occurs or when the access ramp has been passed."""
-        return self.vehicle.crashed or self.vehicle.position[0] > 370
+        return self.vehicle.crashed or self.steps >= self.config["duration"]
+        # return self.vehicle.crashed or self.vehicle.position[0] > 370
 
     def _reset(self) -> None:
         self._make_road()
@@ -114,14 +133,18 @@ class MergeEnv(AbstractEnv):
         road.vehicles.append(ego_vehicle)
 
         other_vehicles_type = utils.class_from_path(self.config["other_vehicles_type"])
-        road.vehicles.append(other_vehicles_type(road, road.network.get_lane(("a", "b", 0)).position(90, 0), speed=29))
-        road.vehicles.append(other_vehicles_type(road, road.network.get_lane(("a", "b", 1)).position(70, 0), speed=31))
-        road.vehicles.append(other_vehicles_type(road, road.network.get_lane(("a", "b", 0)).position(5, 0), speed=31.5))
+        road.vehicles.append(other_vehicles_type(road, road.network.get_lane(("a", "b", 0)).position(90, 0), speed=20))
+        road.vehicles.append(other_vehicles_type(road, road.network.get_lane(("a", "b", 1)).position(70, 0), speed=22))
+        road.vehicles.append(other_vehicles_type(road, road.network.get_lane(("a", "b", 0)).position(5, 0), speed=23))
 
         merging_v = other_vehicles_type(road, road.network.get_lane(("j", "k", 0)).position(110, 0), speed=20)
         merging_v.target_speed = 30
         road.vehicles.append(merging_v)
         self.vehicle = ego_vehicle
+
+        def _cost(self, action: int) -> float:
+            """The cost signal is the occurrence of collision."""
+            return float(self.vehicle.crashed)
 
 
 register(

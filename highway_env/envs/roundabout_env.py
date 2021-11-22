@@ -24,27 +24,38 @@ class RoundaboutEnv(AbstractEnv):
             "action": {
                 "type": "DiscreteMetaAction",
             },
+            "vehicles_count": 20,
+            "vehicles_density": 2,
             "incoming_vehicle_destination": None,
             "collision_reward": -1,
-            "high_speed_reward": 0.2,
+            "high_speed_reward": 2,
             "right_lane_reward": 0,
-            "lane_change_reward": -0.05,
+            "lane_change_reward": -0.1,
+            "accelaration reward": 1,
+            "reward_speed_range": [25, 40],
             "screen_width": 600,
             "screen_height": 600,
             "centering_position": [0.5, 0.6],
-            "duration": 11
+            "duration": 80
         })
         return config
 
     def _reward(self, action: int) -> float:
         lane_change = action == 0 or action == 2
+        scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
+        action_up = action == 3
+        action_down = action == 4
         reward = self.config["collision_reward"] * self.vehicle.crashed \
-            + self.config["high_speed_reward"] * \
-                 MDPVehicle.get_speed_index(self.vehicle) / max(MDPVehicle.SPEED_COUNT - 1, 1) \
-            + self.config["lane_change_reward"] * lane_change
+                    + self.config["lane_change_reward"] * lane_change \
+                    + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
+                    + self.config["accelaration reward"] * action_up \
+                    - self.config["accelaration reward"] * action_down * 2
+            # + self.config["high_speed_reward"] * \
+            #      MDPVehicle.get_speed_index(self.vehicle) / max(MDPVehicle.SPEED_COUNT - 1, 1) \
         return utils.lmap(reward,
-                          [self.config["collision_reward"] + self.config["lane_change_reward"],
-                           self.config["high_speed_reward"]], [0, 1])
+                          [self.config["collision_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
+                           self.config["high_speed_reward"] + self.config["accelaration reward"]],
+                          [0, 1])
 
     def _is_terminal(self) -> bool:
         """The episode is over when a collision occurs or when the access ramp has been passed."""

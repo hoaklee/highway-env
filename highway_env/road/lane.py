@@ -3,7 +3,8 @@ from typing import Tuple, List, Optional
 import numpy as np
 
 from highway_env import utils
-from highway_env.utils import wrap_to_pi, Vector
+from highway_env.types import Vector
+from highway_env.utils import wrap_to_pi
 
 
 class AbstractLane(object):

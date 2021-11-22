@@ -3,7 +3,7 @@ from typing import Tuple, Union
 import numpy as np
 
 from highway_env.road.road import Road, Route, LaneIndex
-from highway_env.utils import Vector
+from highway_env.types import Vector
 from highway_env.vehicle.controller import ControlledVehicle
 from highway_env import utils
 from highway_env.vehicle.kinematics import Vehicle
@@ -36,9 +36,6 @@ class IDMVehicle(ControlledVehicle):
     DELTA = 4.0  # []
     """Exponent of the velocity term."""
 
-    DELTA_RANGE = [3.5, 4.5]
-    """Range of delta when chosen randomly."""
-
     # Lateral policy parameters
     POLITENESS = 0.  # in [0, 1]
     LANE_CHANGE_MIN_ACC_GAIN = 0.2  # [m/s2]
@@ -60,7 +57,7 @@ class IDMVehicle(ControlledVehicle):
         self.timer = timer or (np.sum(self.position)*np.pi) % self.LANE_CHANGE_DELAY
 
     def randomize_behavior(self):
-        self.DELTA = self.road.np_random.uniform(low=self.DELTA_RANGE[0], high=self.DELTA_RANGE[1])
+        pass
 
     @classmethod
     def create_from(cls, vehicle: ControlledVehicle) -> "IDMVehicle":
@@ -143,7 +140,7 @@ class IDMVehicle(ControlledVehicle):
         """
         if not ego_vehicle or not isinstance(ego_vehicle, Vehicle):
             return 0
-        ego_target_speed = abs(utils.not_zero(getattr(ego_vehicle, "target_speed", 0)))
+        ego_target_speed = utils.not_zero(getattr(ego_vehicle, "target_speed", 0))
         acceleration = self.COMFORT_ACC_MAX * (
                 1 - np.power(max(ego_vehicle.speed, 0) / ego_target_speed, self.DELTA))
 
@@ -169,6 +166,34 @@ class IDMVehicle(ControlledVehicle):
             else ego_vehicle.speed - front_vehicle.speed
         d_star = d0 + ego_vehicle.speed * tau + ego_vehicle.speed * dv / (2 * np.sqrt(ab))
         return d_star
+
+    def maximum_speed(self, front_vehicle: Vehicle = None) -> Tuple[float, float]:
+        """
+        Compute the maximum allowed speed to avoid Inevitable Collision States.
+
+        Assume the front vehicle is going to brake at full deceleration and that
+        it will be noticed after a given delay, and compute the maximum speed
+        which allows the ego-vehicle to brake enough to avoid the collision.
+
+        :param front_vehicle: the preceding vehicle
+        :return: the maximum allowed speed, and suggested acceleration
+        """
+        if not front_vehicle:
+            return self.target_speed
+        d0 = self.DISTANCE_WANTED
+        a0 = self.COMFORT_ACC_MIN
+        a1 = self.COMFORT_ACC_MIN
+        tau = self.TIME_WANTED
+        d = max(self.lane_distance_to(front_vehicle) - self.LENGTH / 2 - front_vehicle.LENGTH / 2 - d0, 0)
+        v1_0 = front_vehicle.speed
+        delta = 4 * (a0 * a1 * tau) ** 2 + 8 * a0 * (a1 ** 2) * d + 4 * a0 * a1 * v1_0 ** 2
+        v_max = -a0 * tau + np.sqrt(delta) / (2 * a1)
+
+        # Speed control
+        self.target_speed = min(self.maximum_speed(front_vehicle), self.target_speed)
+        acceleration = self.speed_control(self.target_speed)
+
+        return v_max, acceleration
 
     def change_lane_policy(self) -> None:
         """
