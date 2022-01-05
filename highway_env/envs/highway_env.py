@@ -22,13 +22,13 @@ class HighwayEnv(AbstractEnv):
         config = super().default_config()
         config.update({
             "observation": {
-                "type": "Kinematics",
+                "type": "Graph",
                 "normalize": "True",
                 "absolute": False
             },
             "action": {
-                # "type": "ContinuousAction",
-                "type": "DiscreteMetaAction",
+                "type": "ContinuousAction",
+                # "type": "DiscreteMetaAction",
             },
             "lanes_count": 4,
             "vehicles_count": 20,
@@ -92,35 +92,43 @@ class HighwayEnv(AbstractEnv):
         :param action: the last action performed
         :return: the corresponding reward
         """
-        neighbours = self.road.network.all_side_lanes(self.vehicle.lane_index)
-        lane = self.vehicle.target_lane_index[2] if isinstance(self.vehicle, ControlledVehicle) \
-            else self.vehicle.lane_index[2]
+        # scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
+        # # lane_changed = 0            # TODO: comment when not using discrete action
+        # # if action == 0 or action == 2:        # TODO: comment when not using discrete action
+        # #     lane_changed = 1        # TODO: comment when not using discrete action
+        # lane_changed = action == 0 or action == 2
+        # action_up = action == 3
+        # action_down = action == 4
+        # if self.vehicle.speed < 10:
+        #     reward = 0
+        # else:
+        #     reward = \
+        #         + self.config["collision_reward"] * self.vehicle.crashed \
+        #         + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
+        #         + self.config["accelaration reward"] * action_up \
+        #         - self.config["accelaration reward"] * action_down * 2 \
+        #         + self.config["lane_change_reward"] * lane_changed \
+        #         # + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1)
+        #     reward = utils.lmap(reward,
+        #                       [self.config["collision_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
+        #                        self.config["high_speed_reward"] + self.config["accelaration reward"]],
+        #                       [0, 1])
+        # reward = 0 if not self.vehicle.on_road else reward
+        # return reward
+
         scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
-        lane_changed = 0            # TODO: comment when not using discrete action
-        if action == 0 or action == 2:        # TODO: comment when not using discrete action
-            lane_changed = 1        # TODO: comment when not using discrete action
-        lane_change = action == 0 or action == 2
-        action_up = action == 3
-        action_down = action == 4
-        if self.vehicle.speed < 10:
-            reward = 0
-        else:
-            reward = \
-                + self.config["collision_reward"] * self.vehicle.crashed \
-                + self.config["lane_change_reward"] * lane_changed \
-                + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
-                + self.config["accelaration reward"] * action_up \
-                - self.config["accelaration reward"] * action_down * 2
-                # + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1)
-            # reward = \
-            #     + self.config["collision_reward"] * self.vehicle.crashed \
-            #     + self.config["right_lane_reward"] * lane / max(len(neighbours) - 1, 1) \
-            #     + self.config["lane_change_reward"] * action[0] \
-            #     + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1)
-            reward = utils.lmap(reward,
-                              [self.config["collision_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
-                               self.config["high_speed_reward"] + self.config["accelaration reward"]],
-                              [0, 1])
+        action_speed = action[0]
+        steering = abs(action[1])
+        reward = + self.config["collision_reward"] * self.vehicle.crashed \
+                    + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
+                    + self.config["accelaration reward"] * action_speed \
+                    + self.config["lane_change_reward"] * steering
+        reward = utils.lmap(reward,
+                    [self.config["collision_reward"] - self.config["accelaration reward"]
+                        + self.config["lane_change_reward"],
+                     self.config["high_speed_reward"] + self.config["accelaration reward"]],
+                    [0, 1])
+        reward = 0 if self.vehicle.speed < 10 else reward
         reward = 0 if not self.vehicle.on_road else reward
         return reward
 

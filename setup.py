@@ -1,8 +1,13 @@
-# Following PEP 517/518, this file should not not needed and replaced instead by the setup.cfg file and pyproject.toml.
-# Unfortunately it is still required py the pip editable mode `pip install -e`
-# See https://stackoverflow.com/a/60885212
+import gym
+import highway_env
 
-from setuptools import setup
+env = gym.make("highway-v0")
 
-if __name__ == "__main__":
-    setup()
+done = False
+obs_list = []
+while not done:
+    action = [-0.2, 0]
+    obs, reward, done, info = env.step(action)
+    obs_list.append(reward)
+    env.render()
+print(obs_list)

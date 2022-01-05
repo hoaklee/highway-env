@@ -17,12 +17,14 @@ class RoundaboutEnv(AbstractEnv):
         config = super().default_config()
         config.update({
             "observation": {
-                "type": "Kinematics",
-                "absolute": True,
+                # "type": "Kinematics",
+                "type": "Graph",
+                "absolute": False,
                 "features_range": {"x": [-100, 100], "y": [-100, 100], "vx": [-15, 15], "vy": [-15, 15]},
             },
             "action": {
-                "type": "DiscreteMetaAction",
+                # "type": "DiscreteMetaAction",
+                "type": "ContinuousAction",
             },
             "vehicles_count": 20,
             "vehicles_density": 2,
@@ -36,29 +38,48 @@ class RoundaboutEnv(AbstractEnv):
             "screen_width": 600,
             "screen_height": 600,
             "centering_position": [0.5, 0.6],
-            "duration": 80
+            "duration": 80,
+            "disable_collision_checks": True,
+            "offroad_terminal": True,
         })
         return config
 
     def _reward(self, action: int) -> float:
-        lane_change = action == 0 or action == 2
-        scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
-        action_up = action == 3
-        action_down = action == 4
+        # lane_change = action == 0 or action == 2
+        # scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
+        # action_up = action == 3
+        # action_down = action == 4
+        # if self.vehicle.speed < 10:
+        #     reward = 0
+        # else:
+        #     reward = self.config["collision_reward"] * self.vehicle.crashed \
+        #             + self.config["lane_change_reward"] * lane_change \
+        #             + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
+        #             + self.config["accelaration reward"] * action_up \
+        #             - self.config["accelaration reward"] * action_down * 2
+        #             # + self.config["high_speed_reward"] * \
+        #             #      MDPVehicle.get_speed_index(self.vehicle) / max(MDPVehicle.SPEED_COUNT - 1, 1) \
+        #     reward = utils.lmap(reward,
+        #                   [self.config["collision_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
+        #                    self.config["high_speed_reward"] + self.config["accelaration reward"]],
+        #                   [0, 1])
+        # return reward
+
         if self.vehicle.speed < 10:
             reward = 0
         else:
+            scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
+            action_speed = action[0]
+            steering = abs(action[1])
             reward = self.config["collision_reward"] * self.vehicle.crashed \
-                    + self.config["lane_change_reward"] * lane_change \
-                    + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
-                    + self.config["accelaration reward"] * action_up \
-                    - self.config["accelaration reward"] * action_down * 2
-                    # + self.config["high_speed_reward"] * \
-                    #      MDPVehicle.get_speed_index(self.vehicle) / max(MDPVehicle.SPEED_COUNT - 1, 1) \
+                     + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
+                     + self.config["accelaration reward"] * action_speed \
+                     + self.config["lane_change_reward"] * steering
             reward = utils.lmap(reward,
-                          [self.config["collision_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
-                           self.config["high_speed_reward"] + self.config["accelaration reward"]],
-                          [0, 1])
+                                [self.config["collision_reward"] + self.config["lane_change_reward"]
+                                    - self.config["accelaration reward"],
+                                 self.config["high_speed_reward"] + self.config["accelaration reward"]],
+                                [0, 1])
         return reward
 
     def _is_terminal(self) -> bool:

@@ -24,22 +24,28 @@ class MergeEnv(AbstractEnv):
         cfg = super().default_config()
         cfg.update({
             "observation": {
-                "type": "Kinematics",
+                # "type": "Kinematics",
+                "type": "Graph",
                 "normalize": "True",
                 "absolute": False
+            },
+            "action": {
+                # "type": "DiscreteMetaAction",
+                "type": "ContinuousAction",
             },
             "vehicles_count": 20,
             "vehicles_density": 2,
             "collision_reward": -1,
             "right_lane_reward": 0,
             "high_speed_reward": 2,
-            "merging_speed_reward": 0,
+            "merging_speed_reward": 0.1,
             "lane_change_reward": -0.05,
             "accelaration reward": 1,
             "reward_speed_range": [25, 40],
             "duration": 80,
             "ego_spacing": 1.5,
-            "disable_collision_checks": True
+            "disable_collision_checks": True,
+            "offroad_terminal": True,
         })
         return cfg
 
@@ -52,36 +58,51 @@ class MergeEnv(AbstractEnv):
         :param action: the action performed
         :return: the reward of the state-action transition
         """
-        action_reward = {0: self.config["lane_change_reward"],
-                         1: 0,
-                         2: self.config["lane_change_reward"],
-                         3: 0,
-                         4: 0}
+        # action_reward = {0: self.config["lane_change_reward"],
+        #                  1: 0,
+        #                  2: self.config["lane_change_reward"],
+        #                  3: 0,
+        #                  4: 0}
+        # scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
+        # action_up = action == 3
+        # action_down = action == 4
+        # if self.vehicle.speed < 10:
+        #     reward = 0
+        # else:
+        #     reward = self.config["collision_reward"] * self.vehicle.crashed \
+        #         + self.config["right_lane_reward"] * self.vehicle.lane_index[2] / 1 \
+        #         + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
+        #         + self.config["accelaration reward"] * action_up \
+        #         - self.config["accelaration reward"] * action_down * 2
+        #         # + self.config["high_speed_reward"] * self.vehicle.speed_index / (self.vehicle.SPEED_COUNT - 1) \
+        #
+        #     reward = utils.lmap(action_reward[action] + reward,
+        #                   [self.config["collision_reward"] + self.config["merging_speed_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
+        #                    self.config["high_speed_reward"] + self.config["accelaration reward"]],
+        #                   [0, 1])
+        #
+        # return reward
+
         scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
-        action_up = action == 3
-        action_down = action == 4
-        if self.vehicle.speed < 10:
-            reward = 0
-        else:
-            reward = self.config["collision_reward"] * self.vehicle.crashed \
-                + self.config["right_lane_reward"] * self.vehicle.lane_index[2] / 1 \
-                + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
-                + self.config["accelaration reward"] * action_up \
-                - self.config["accelaration reward"] * action_down * 2
-                # + self.config["high_speed_reward"] * self.vehicle.speed_index / (self.vehicle.SPEED_COUNT - 1) \
+        action_speed = action[0]
+        steering = abs(action[1])
+        reward = self.config["collision_reward"] * self.vehicle.crashed \
+                 + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
+                 + self.config["accelaration reward"] * action_speed \
+                 + self.config["lane_change_reward"] * steering
 
         # Altruistic penalty
-        # for vehicle in self.road.vehicles:
-        #     if vehicle.lane_index == ("b", "c", 2) and isinstance(vehicle, ControlledVehicle):
-        #         reward += self.config["merging_speed_reward"] * \
-        #                   (vehicle.target_speed - vehicle.speed) / vehicle.target_speed
+        for vehicle in self.road.vehicles:
+            if vehicle.lane_index == ("b", "c", 2) and isinstance(vehicle, ControlledVehicle):
+                reward += self.config["merging_speed_reward"] * \
+                          (vehicle.target_speed - vehicle.speed) / vehicle.target_speed
 
-            reward = utils.lmap(action_reward[action] + reward,
-                          [self.config["collision_reward"] + self.config["merging_speed_reward"] + self.config["lane_change_reward"] - self.config["accelaration reward"] * 2,
-                           self.config["high_speed_reward"] + self.config["accelaration reward"]],
+        return utils.lmap(reward,
+                          [self.config["collision_reward"] - self.config["accelaration reward"]
+                            + self.config["lane_change_reward"],
+                           self.config["high_speed_reward"] + self.config["accelaration reward"]
+                            + self.config["merging_speed_reward"]],
                           [0, 1])
-
-        return reward
 
     def _is_terminal(self) -> bool:
         """The episode is over when a collision occurs or when the access ramp has been passed."""
