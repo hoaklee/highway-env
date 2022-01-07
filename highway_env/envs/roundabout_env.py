@@ -84,7 +84,9 @@ class RoundaboutEnv(AbstractEnv):
 
     def _is_terminal(self) -> bool:
         """The episode is over when a collision occurs or when the access ramp has been passed."""
-        return self.vehicle.crashed or self.steps >= self.config["duration"]
+        return self.vehicle.crashed or \
+                self.steps >= self.config["duration"] \
+                (self.config["offroad_terminal"] and not self.vehicle.on_road)
 
     def _reset(self) -> None:
         self._make_road()

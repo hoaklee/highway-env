@@ -119,16 +119,16 @@ class HighwayEnv(AbstractEnv):
         scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
         action_speed = action[0]
         steering = abs(action[1])
-        reward = + self.config["collision_reward"] * self.vehicle.crashed \
+        reward = self.config["collision_reward"] * self.vehicle.crashed \
                     + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
                     + self.config["accelaration reward"] * action_speed \
                     + self.config["lane_change_reward"] * steering
+        reward = -1 if self.vehicle.speed < 15 else reward
         reward = utils.lmap(reward,
                     [self.config["collision_reward"] - self.config["accelaration reward"]
                         + self.config["lane_change_reward"],
                      self.config["high_speed_reward"] + self.config["accelaration reward"]],
                     [0, 1])
-        reward = 0 if self.vehicle.speed < 10 else reward
         reward = 0 if not self.vehicle.on_road else reward
         return reward
 

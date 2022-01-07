@@ -97,16 +97,24 @@ class MergeEnv(AbstractEnv):
                 reward += self.config["merging_speed_reward"] * \
                           (vehicle.target_speed - vehicle.speed) / vehicle.target_speed
 
-        return utils.lmap(reward,
+        reward = 0 if self.vehicle.speed < 10 else reward
+
+        reward = utils.lmap(reward,
                           [self.config["collision_reward"] - self.config["accelaration reward"]
                             + self.config["lane_change_reward"],
                            self.config["high_speed_reward"] + self.config["accelaration reward"]
                             + self.config["merging_speed_reward"]],
                           [0, 1])
 
+        reward = 0 if not self.vehicle.on_road else reward
+
+        return reward
+
     def _is_terminal(self) -> bool:
         """The episode is over when a collision occurs or when the access ramp has been passed."""
-        return self.vehicle.crashed or self.steps >= self.config["duration"]
+        return self.vehicle.crashed or \
+                self.steps >= self.config["duration"] \
+                (self.config["offroad_terminal"] and not self.vehicle.on_road)
         # return self.vehicle.crashed or self.vehicle.position[0] > 370
 
     def _reset(self) -> None:
