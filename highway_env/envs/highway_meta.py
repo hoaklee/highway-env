@@ -2,7 +2,7 @@ import numpy as np
 
 from highway_env.envs.highway_env import HighwayEnv
 from highway_env import utils
-from rlkit.envs import register_env     # only used with rlkit
+from highway_env.utils import register_env     # only used with rlkit
 
 
 @register_env('highway-speed')
