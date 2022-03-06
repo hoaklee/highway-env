@@ -222,7 +222,11 @@ class GraphObservation(ObservationType):
         obs = df.values.copy()
         if self.order == "shuffled":
             self.env.np_random.shuffle(obs[1:])
-        return obs.flatten()
+        obs = obs.flatten()
+        # goal_speed = float(np.interp(self.env._goal, (15, 30), (-1, 1)))       # for true label
+        # goal = np.array([goal_speed for _ in range(5)])
+        # obs = np.concatenate((obs, goal))
+        return obs
 
 
 class KinematicObservation(ObservationType):

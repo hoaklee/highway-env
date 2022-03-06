@@ -1,9 +1,14 @@
 import numpy as np
+import torch
 
 from highway_env.envs.highway_env import HighwayEnv
 from highway_env import utils
-from highway_env.utils import register_env     # only used with rlkit
-
+from rlkit.envs import register_env     # only used with rlkit
+# from highway_env.envs import register_env
+# from gym.envs.registration import register
+#
+# register(id='highwayspeed-v0',
+#          entry_point='highway_env.envs.highway_meta:HighwayMetaEnv')
 
 @register_env('highway-speed')
 class HighwayMetaEnv(HighwayEnv):
@@ -22,17 +27,18 @@ class HighwayMetaEnv(HighwayEnv):
         scaled_speed = utils.lmap(self.vehicle.speed, self.config["reward_speed_range"], [0, 1])
         action_speed = action[0]
         steering = abs(action[1])
-        speed_difference = abs(self.vehicle.speed - goal_speed) / 20
+        # speed_difference = abs(self.vehicle.speed - goal_speed) / 10
+        speed_difference = utils.lmap(abs(self.vehicle.speed - goal_speed), [0, 15], [0, 1])
         reward = self.config["collision_reward"] * self.vehicle.crashed \
                     + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1) \
-                    + self.config["accelaration reward"] * action_speed \
+                    + self.config["acceleration reward"] * action_speed \
                     + self.config["lane_change_reward"] * steering \
                     + self.config["goal_diffrence_reward"] * speed_difference
-        reward = -1 if self.vehicle.speed < 20 else reward
+        # reward = -1 if self.vehicle.speed < 20 else reward
         reward = utils.lmap(reward,
-                    [self.config["collision_reward"] - self.config["accelaration reward"]
+                    [self.config["collision_reward"] - self.config["acceleration reward"]
                         + self.config["lane_change_reward"] + self.config["goal_diffrence_reward"],
-                     self.config["high_speed_reward"] + self.config["accelaration reward"]],
+                     self.config["high_speed_reward"] + self.config["acceleration reward"]],
                     [0, 1])
         reward = 0 if not self.vehicle.on_road else reward
         return reward
@@ -40,7 +46,6 @@ class HighwayMetaEnv(HighwayEnv):
     def step(self, action):
         """
         Perform an action and step the environment dynamics.
-
         The action is executed by the ego-vehicle, and all other vehicles on the road performs their default behaviour
         for several simulation timesteps until the next decision making step.
 
@@ -89,6 +94,7 @@ class HighwayMetaEnv(HighwayEnv):
 
     def sample_tasks(self, num_tasks):
         np.random.seed(1337)
-        velocities = np.random.uniform(25, 40, size=(num_tasks,))
+        # velocities = np.random.uniform(15, 30, size=(num_tasks,))
+        velocities = [30 for _ in range(10)]   #only for defined tasks
         tasks = [{'goal': velocity} for velocity in velocities]
         return tasks
